@@ -1,0 +1,44 @@
+name: Build Custom Caddy
+
+on:
+  schedule:
+    - cron: '0 0 * * *' # Checks every day at midnight
+  workflow_dispatch:      # Allows you to run it manually
+
+env:
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout 🛎️
+        uses: actions/checkout@v4
+
+      - name: Get latest Caddy version ⬇️ 
+        id: caddy_version
+        run: |
+          # Fetch the latest release tag from Caddy's official API
+          VERSION=$(curl -s https://api.github.com/repos/caddyserver/caddy/releases/latest | jq -r .tag_name | sed 's/v//')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Log in to Docker Hub 🔐
+        uses: docker/login-action@v3
+        with:
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build 🏗️ & Push to Docker Hub 🚀
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          build-args: |
+            CADDY_VERSION=${{ steps.caddy_version.outputs.version }}
+          tags: |
+            ${{ env.IMAGE_NAME }}:latest
+            ${{ env.IMAGE_NAME }}:${{ steps.caddy_version.outputs.version }}
